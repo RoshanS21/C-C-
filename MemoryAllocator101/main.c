@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <memory.h>
 
+typedef char ALIGN[16];
+
 void *malloc(size_t size)
 {
     void *block;
@@ -12,10 +14,15 @@ void *malloc(size_t size)
     return block;
 }
 
-struct header_t
+union header
 {
-    size_t size;
-    unsigned is_free;
-    struct header_t *next;
+    struct
+    {
+        size_t size;
+        unsigned is_free;
+        union header *next;
+    } s;
+    ALIGN stub;
 };
+typedef union header header_t;
 

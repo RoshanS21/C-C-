@@ -3,8 +3,6 @@
 #include <pthread.h>
 
 typedef char ALIGN[16];
-header_t *head, *tail;
-pthread_mutex_t global_malloc_lock;
 
 union header
 {
@@ -17,6 +15,9 @@ union header
     ALIGN stub;
 };
 typedef union header header_t;
+
+header_t *head, *tail;
+pthread_mutex_t global_malloc_lock;
 
 header_t *get_free_block(size_t size)
 {
@@ -66,6 +67,41 @@ void *malloc(size_t size)
     return (void*)(header + 1);
 }
 
+void *calloc(size_t num, size_t nsize)
+{
+    size_t size;
+    void *block;
+    if(!num || !nsize)
+        return NULL;
+    size = num * nsize;
+    if(nsize != size/num) // check multiplication overflow
+        return NULL;
+    block = malloc(size);
+    if(!block)
+        return NULL;
+    memset(block, 0, size); // clear the allocated memory to all zeores
+    return block;
+}
+
+void *realloc(void *block, size_t size)
+{
+    header_t *header;
+    void *ret;
+    if(!block || !size)
+        return malloc(size);
+    header = (header_t*)block - 1;
+    if(header->s.size >= size) // if block has size to accomodate requested size, do nothing
+        return block;
+    ret = malloc(size);
+    if(ret)
+    {
+        memcpy(ret, block, header->s.size); // relocate contents of block to new bigger block
+        free(block);
+    }
+
+    return ret;
+}
+
 void free(void *block)
 {
     header_t *header, *tmp;
@@ -100,3 +136,4 @@ void free(void *block)
     header->s.is_free = 1;
     pthread_mutex_unlock(&global_malloc_lock);
 }
+

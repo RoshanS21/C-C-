@@ -6,6 +6,18 @@ typedef char ALIGN[16];
 header_t *head, *tail;
 pthread_mutex_t global_malloc_lock;
 
+union header
+{
+    struct
+    {
+        size_t size;
+        unsigned is_free;
+        union header *next;
+    } s;
+    ALIGN stub;
+};
+typedef union header header_t;
+
 header_t *get_free_block(size_t size)
 {
     header_t *curr = head;
@@ -54,14 +66,37 @@ void *malloc(size_t size)
     return (void*)(header + 1);
 }
 
-union header
+void free(void *block)
 {
-    struct
+    header_t *header, *tmp;
+    void *programbreak;
+    if(!block)
+        return;
+    pthread_mutex_lock(&global_malloc_lock);
+    header = (header_t*)block - 1;
+
+    programbreak - sbrk(0); // gives the current value of program break
+    if((char*)block + header->s.size == programbreak)
     {
-        size_t size;
-        unsigned is_free;
-        union header *next;
-    } s;
-    ALIGN stub;
-};
-typedef union header header_t;
+        if(head == tail)
+            head = tail = NULL;
+        else
+        {
+            tmp = head;
+            while(tmp)
+            {
+                if(tmp->s.next == tail)
+                {
+                    tmp->s.next = NULL;
+                    tail = tmp;
+                }
+                tmp = tmp->s.next;
+            }
+        }
+        sbrk(0 - sizeof(header_t) - header->s.size); // release this amount of memory to OS
+        pthread_mutex_unlock(&global_malloc_lock);
+        return;
+    }
+    header->s.is_free = 1;
+    pthread_mutex_unlock(&global_malloc_lock);
+}

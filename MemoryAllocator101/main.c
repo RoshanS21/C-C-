@@ -137,3 +137,14 @@ void free(void *block)
     pthread_mutex_unlock(&global_malloc_lock);
 }
 
+/* A debug function to print the entire link list */
+void print_mem_list()
+{
+	header_t *curr = head;
+	printf("head = %p, tail = %p \n", (void*)head, (void*)tail);
+	while(curr) {
+		printf("addr = %p, size = %zu, is_free=%u, next=%p\n",
+			(void*)curr, curr->s.size, curr->s.is_free, (void*)curr->s.next);
+		curr = curr->s.next;
+	}
+}
